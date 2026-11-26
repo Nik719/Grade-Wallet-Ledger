@@ -101,6 +101,7 @@ POST       /wallets/topup                         Top up funds from system cash_
 POST       /wallets/withdraw                      Withdraw funds to system cash_out
 POST       /transfers                             Execute peer-to-peer transfer
 POST       /admin/transfers/{id}/release          Approve or reject held transfer
+POST       /admin/transfers/{id}/reverse          Reverse a completed transfer (body: actor, reason)
 POST       /admin/reconciliation/run              Trigger manual reconciliation audit
 POST       /users/{id}/statement/ask              Natural language statement query
 ```

@@ -90,21 +90,32 @@ def transfer_money(
             raise WalletAPIException("SOURCE_ACCOUNT_NOT_FOUND", "Source account does not exist", 404)
         user_id = src_row["user_id"] or 0
 
+    return _run_idempotent_transfer(
+        conn, user_id, idempotency_key, payload.model_dump(),
+        source_id=payload.source_account_id,
+        destination_id=payload.destination_account_id,
+        amount_paise=payload.amount,
+        transfer_type="peer_transfer",
+        note=payload.note,
+    )
+
+def _run_idempotent_transfer(
+    conn: psycopg.Connection,
+    user_id: int,
+    idempotency_key: str,
+    raw_payload: dict,
+    **transfer_kwargs,
+):
+    """
+    Shared idempotent execution path for transfers, top-ups and withdrawals.
+    Insufficient funds become a cached 400 response instead of an unhandled 500.
+    """
     try:
-        # Idempotency pre-check
-        raw_payload = payload.model_dump()
         saved_code, saved_body = handle_idempotency_start(conn, user_id, idempotency_key, raw_payload)
         if saved_code is not None:
             return JSONResponse(content=saved_body, status_code=saved_code)
 
-        result = execute_transfer(
-            conn=conn,
-            source_id=payload.source_account_id,
-            destination_id=payload.destination_account_id,
-            amount_paise=payload.amount,
-            transfer_type="peer_transfer",
-            note=payload.note
-        )
+        result = execute_transfer(conn=conn, **transfer_kwargs)
         conn.commit()
         handle_idempotency_complete(conn, user_id, idempotency_key, 200, result)
         conn.commit()
@@ -142,23 +153,14 @@ def topup_wallet(
     if not cash_in or not wallet:
         raise WalletAPIException("SETUP_ERROR", "Target wallet or Cash-In account not found", 404)
 
-    raw_payload = payload.model_dump()
-    saved_code, saved_body = handle_idempotency_start(conn, wallet["user_id"], idempotency_key, raw_payload)
-    if saved_code is not None:
-        return JSONResponse(content=saved_body, status_code=saved_code)
-
-    result = execute_transfer(
-        conn=conn,
+    return _run_idempotent_transfer(
+        conn, wallet["user_id"], idempotency_key, payload.model_dump(),
         source_id=cash_in["id"],
         destination_id=payload.account_id,
         amount_paise=payload.amount,
         transfer_type="top_up",
-        note="Top-up from external gateway"
+        note="Top-up from external gateway",
     )
-    conn.commit()
-    handle_idempotency_complete(conn, wallet["user_id"], idempotency_key, 200, result)
-    conn.commit()
-    return result
 
 @router.post("/wallets/withdraw")
 def withdraw_wallet(
@@ -178,23 +180,14 @@ def withdraw_wallet(
     if not cash_out or not wallet:
         raise WalletAPIException("SETUP_ERROR", "Target wallet or Cash-Out account not found", 404)
 
-    raw_payload = payload.model_dump()
-    saved_code, saved_body = handle_idempotency_start(conn, wallet["user_id"], idempotency_key, raw_payload)
-    if saved_code is not None:
-        return JSONResponse(content=saved_body, status_code=saved_code)
-
-    result = execute_transfer(
-        conn=conn,
+    return _run_idempotent_transfer(
+        conn, wallet["user_id"], idempotency_key, payload.model_dump(),
         source_id=payload.account_id,
         destination_id=cash_out["id"],
         amount_paise=payload.amount,
         transfer_type="withdrawal",
-        note="Withdrawal to linked bank"
+        note="Withdrawal to linked bank",
     )
-    conn.commit()
-    handle_idempotency_complete(conn, wallet["user_id"], idempotency_key, 200, result)
-    conn.commit()
-    return result
 
 @router.get("/wallets/{account_id}/statement")
 def get_statement(
