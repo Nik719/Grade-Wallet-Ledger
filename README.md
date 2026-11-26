@@ -1,5 +1,5 @@
 # Grade Wallet Ledger Core Engine
-A production-grade, distributed payment and ledger backend engine built with FastAPI and PostgreSQL 15+. Designed with strict financial consistency, this wallet ensures money never appears from nowhere, disappears, or moves twice.
+The backend for a digital wallet, the kind behind a UPI or payments app. Users open INR wallets, top them up, send money to each other and withdraw. Every rupee is recorded twice (a debit and a matching credit) in a PostgreSQL ledger. Money must never appear from nowhere, disappear, or move twice.
 
 ### Key Highlights
 - Strict Double-Entry Bookkeeping: Every monetary transaction atomically generates at least two immutable ledger entries (debit and credit) such that $\sum \text{Debits} = \sum \text{Credits}$. Immutability is strictly enforced at the database level via triggers disallowing UPDATE and DELETE operations.
