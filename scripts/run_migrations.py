@@ -15,7 +15,10 @@ def run_migrations():
 
             with open("app/db/migrations/002_account_opening_balance.sql", "r") as f:
                 cur.execute(f.read())
-            
+
+            with open("app/db/migrations/003_transfer_reversals.sql", "r") as f:
+                cur.execute(f.read())
+
             # 2. Guarantee System Accounts Exist
             cur.execute("""
                 INSERT INTO accounts (account_type, name, currency, balance)

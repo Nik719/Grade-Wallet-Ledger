@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import psycopg
 
 from app.db.session import pool, get_db_connection
 from app.core.errors import WalletAPIException
 from app.services.reconciliation import run_reconciliation
+from app.services.reversal import execute_reversal
 
 router = APIRouter(tags=["Admin"])
 
@@ -12,6 +13,20 @@ class ReleaseTransferRequest(BaseModel):
     action: str  # 'approve' or 'reject'
     actor: str
     reason: str
+
+class ReverseTransferRequest(BaseModel):
+    actor: str = Field(..., min_length=1, max_length=128)
+    reason: str = Field(..., min_length=1)
+
+@router.post("/admin/transfers/{transfer_id}/reverse")
+def reverse_transfer(
+    transfer_id: int,
+    payload: ReverseTransferRequest,
+    conn: psycopg.Connection = Depends(get_db_connection)
+):
+    result = execute_reversal(conn, transfer_id, payload.actor, payload.reason)
+    conn.commit()
+    return result
 
 @router.post("/admin/reconciliation/run")
 def trigger_reconciliation():
